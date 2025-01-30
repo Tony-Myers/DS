@@ -43,7 +43,7 @@ def generate_response(prompt, conversation_history=None):
         }
         
         data = {
-            "model": "deepseek-chat",  # Change if DeepSeek has a different model name
+            "model": "deepseek-chat-7b",  # Change if DeepSeek has a different model name
             "messages": messages,
             "max_tokens": 110,
             "temperature": 0.6
@@ -103,7 +103,7 @@ def main():
 
         # Progress bar with a label indicating interview progress
         completed_questions = len([entry for entry in st.session_state.conversation if entry['role'] == "user"])
-        progress_percentage = completed_questions / total_questions
+        progress_percentage = min(completed_questions / total_questions, 1.0)
         st.write(f"**Interview Progress: {completed_questions} out of {total_questions} questions answered**")
         st.progress(progress_percentage)
 
