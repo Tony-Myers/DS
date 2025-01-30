@@ -125,7 +125,7 @@ def main():
                 # Set submitted flag to true
                 st.session_state.submitted = True
                 
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.warning("Please provide an answer before submitting.")
 
@@ -147,7 +147,7 @@ def main():
         if st.button("Restart Interview"):
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
-           st.rerun()
+            st.rerun()
 
 if __name__ == "__main__":
     main()
