@@ -1,10 +1,12 @@
 import streamlit as st
+import requests
 import pandas as pd
 import base64
 
 # Retrieve the password and DeepSeek API key from Streamlit secrets
 PASSWORD = st.secrets["password"]
 DEEPSEEK_API_KEY = st.secrets["deepseek_api_key"]
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"  # Adjust if DeepSeek's endpoint differs
 
 # List of interview topics
 interview_topics = [
@@ -25,9 +27,9 @@ def generate_response(prompt, conversation_history=None):
         if conversation_history is None:
             conversation_history = []
 
-        system_content = """You are an experienced and considerate interviewer in higher education, focusing on AI applications. Use British English in your responses, including spellings like 'democratised'. Ensure your responses are complete and not truncated.
+        system_content = """You are an experienced and considerate interviewer in higher education, focusing on AI applications. Use British English in your responses, including spellings like 'democratised'. Ensure your responses are complete and not truncated. 
         After each user response, provide brief feedback and ask a relevant follow-up question based on their answer. Tailor your questions to the user's previous responses, avoiding repetition and exploring areas they haven't covered. Be adaptive and create a natural flow of conversation."""
-
+        
         messages = [
             {"role": "system", "content": system_content},
             {"role": "system", "content": f"Interview topics: {interview_topics}"},
@@ -35,10 +37,22 @@ def generate_response(prompt, conversation_history=None):
             {"role": "user", "content": prompt}
         ]
 
-        # Replace OpenAI with DeepSeek API client
-        response = deepseek_client.generate_response(messages, DEEPSEEK_API_KEY)
+        headers = {
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": "deepseek-chat-7b",  # Change if DeepSeek has a different model name
+            "messages": messages,
+            "max_tokens": 110,
+            "temperature": 0.6
+        }
 
-        return response.choices[0].message.content
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=data)
+        response.raise_for_status()
+        response_json = response.json()
+        return response_json["choices"][0]["message"]["content"]
     except Exception as e:
         return f"An error occurred in generate_response: {str(e)}"
 
@@ -48,19 +62,6 @@ def get_transcript_download_link(conversation):
     b64 = base64.b64encode(csv.encode()).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="interview_transcript.csv">Download Transcript</a>'
     return href
-
-class DeepSeekClient:
-    def __init__(self, api_key):
-        self.api_key = api_key
-
-    def generate_response(self, messages, api_key):
-        # This is a placeholder for the actual API call.
-        # Replace this with your actual implementation to interact with the DeepSeek API.
-        return {
-            "choices": [
-                {"message": {"content": "This is a sample AI response."}}
-            ]
-        }
 
 def main():
     # Password authentication
@@ -110,20 +111,20 @@ def main():
             if user_answer:
                 # Add user's answer to conversation history
                 st.session_state.conversation.append({"role": "user", "content": user_answer})
-
+                
                 # Generate AI response
                 ai_prompt = f"User's answer: {user_answer}\nProvide feedback and ask a follow-up question."
                 ai_response = generate_response(ai_prompt, st.session_state.conversation)
-
+                
                 # Add AI's response to conversation history
                 st.session_state.conversation.append({"role": "assistant", "content": ai_response})
-
+                
                 # Update current question with AI's follow-up
                 st.session_state.current_question = ai_response
-
+                
                 # Set submitted flag to true
                 st.session_state.submitted = True
-
+                
                 st.experimental_rerun()
             else:
                 st.warning("Please provide an answer before submitting.")
@@ -139,7 +140,7 @@ def main():
             for entry in st.session_state.conversation:
                 st.write(f"{entry['role'].capitalize()}: {entry['content']}")
                 st.write("---")
-
+            
             st.markdown(get_transcript_download_link(st.session_state.conversation), unsafe_allow_html=True)
 
         # Option to restart the interview
