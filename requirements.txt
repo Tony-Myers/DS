@@ -1,3 +1,4 @@
-streamlit
-deepseek-api-client
+streamlit==0.123.4  # Replace with the appropriate version
 pandas
+requests
+tiktoken
