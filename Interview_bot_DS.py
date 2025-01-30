@@ -1,23 +1,56 @@
 import streamlit as st
+from openai import OpenAI  # Ensure this is the correct package name if it exists
 import pandas as pd
-import base64
+import requests
+import re
+import tiktoken
+import os
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_ORIENT
+from docx.shared import Pt, Inches, RGBColor
+from docx.oxml import OxmlElement
+from docx.oxml.ns import nsdecls
+from io import BytesIO, StringIO
+from PyPDF2 import PdfReader
 
-# Retrieve the password from Streamlit secrets
-PASSWORD = st.secrets["password"]
+# Configuration
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+ALLOWED_EXTENSIONS = ["docx", "pdf"]
+MAX_TOKENS = 7000
+PROMPT_BUFFER = 1000
 
-# List of interview topics
-interview_topics = [
-    "Introduction and personal background",
-    "Experiences using generative AI tools",
-    "Perceived benefits of generative AI in coursework",
-    "Challenges faced when integrating AI tools",
-    "Impact on academic development and assessment performance",
-    "Strategies for incorporating AI outputs into work",
-    "Effectiveness of guidance on prompt design and AI competencies",
-    "Generative AI's role in creating accessible educational environments"
-]
+# Initialize encoding
+try:
+    encoding = tiktoken.encoding_for_model("deepseek-chat")
+except KeyError:
+    encoding = tiktoken.get_encoding("cl100k_base")
 
-total_questions = len(interview_topics)  # Total number of interview topics for progress bar
+def count_tokens(text):
+    return len(encoding.encode(text))
+
+def truncate_text(text, max_tokens):
+    tokens = encoding.encode(text)
+    return encoding.decode(tokens[:max_tokens]) if len(tokens) > max_tokens else text
+
+def call_deepseek_api(prompt, system_prompt):
+    headers = {
+        "Authorization": f"Bearer {st.secrets['DEEPSEEK_API_KEY']}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "model": "deepseek-reasoner",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.3,
+        "max_tokens": 3000
+    }
+    
+    response = requests.post(DEEPSEEK_API_URL, headers=headers, json=data)
+    response.raise_for_status()  # This will raise an HTTPError if the HTTP request returned an unsuccessful status code
+    return response.json()['choices'][0]['message']['content']
 
 def generate_response(prompt, conversation_history=None):
     try:
@@ -29,15 +62,13 @@ def generate_response(prompt, conversation_history=None):
 
         messages = [
             {"role": "system", "content": system_content},
-            {"role": "system", "content": f"Interview topics: {interview_topics}"},
             *conversation_history[-6:],  # Include the last 6 exchanges for more context
             {"role": "user", "content": prompt}
         ]
 
-        client = DeepSeekClient(api_key=DEEPSEEK_API_KEY)
-        response = client.generate_response(messages)
+        response = call_deepseek_api(prompt, system_content)
+        return response
 
-        return response['content']
     except Exception as e:
         return f"An error occurred in generate_response: {str(e)}"
 
@@ -56,12 +87,12 @@ def main():
     if not st.session_state.authenticated:
         password = st.text_input("Enter password to access the interview app:", type="password")
         if st.button("Submit"):
-            if password == PASSWORD:
+            if password == PASSWORD:  # Ensure you have defined PASSWORD correctly
                 st.session_state.authenticated = True
                 st.success("Access granted.")
             else:
                 st.error("Incorrect password.")
-        return  # Stop the app here if not authenticated
+        return
 
     # Interview app content (only shown if authenticated)
     st.title("AI Interview Bot")
@@ -73,12 +104,6 @@ def main():
     if "submitted" not in st.session_state:
         st.session_state.submitted = False
 
-    st.write("""
-    Before we begin, please read the information sheet provided and understand that by ticking yes, you will be giving your written informed consent for your responses to be used for research purposes and may be anonymously quoted in publications.
-    
-    You can choose to end the interview at any time and request your data be removed by emailing tony.myers@staff.ac.uk. This interview will be conducted by an AI assistant who, along with asking set questions, will ask additional probing questions depending on your response.
-    """)
-
     consent = st.checkbox("I have read the information sheet and give my consent to participate in this interview.")
 
     if consent:
@@ -88,6 +113,7 @@ def main():
 
         # Progress bar with a label indicating interview progress
         completed_questions = len([entry for entry in st.session_state.conversation if entry['role'] == "user"])
+        total_questions = len(interview_topics)
         progress_percentage = completed_questions / total_questions
         st.write(f"**Interview Progress: {completed_questions} out of {total_questions} questions answered**")
         st.progress(progress_percentage)
@@ -96,25 +122,24 @@ def main():
             if user_answer:
                 # Add user's answer to conversation history
                 st.session_state.conversation.append({"role": "user", "content": user_answer})
-
+                
                 # Generate AI response
                 ai_prompt = f"User's answer: {user_answer}\nProvide feedback and ask a follow-up question."
                 ai_response = generate_response(ai_prompt, st.session_state.conversation)
-
+                
                 # Add AI's response to conversation history
                 st.session_state.conversation.append({"role": "assistant", "content": ai_response})
-
+                
                 # Update current question with AI's follow-up
                 st.session_state.current_question = ai_response
-
+                
                 # Set submitted flag to true
                 st.session_state.submitted = True
-
+                
                 st.experimental_rerun()
             else:
                 st.warning("Please provide an answer before submitting.")
 
-        # Option to end the interview
         if st.button("End Interview"):
             st.success("Interview completed! Thank you for your insights on AI in education.")
             st.session_state.current_question = "Interview ended"
@@ -125,10 +150,9 @@ def main():
             for entry in st.session_state.conversation:
                 st.write(f"{entry['role'].capitalize()}: {entry['content']}")
                 st.write("---")
-
+            
             st.markdown(get_transcript_download_link(st.session_state.conversation), unsafe_allow_html=True)
 
-        # Option to restart the interview
         if st.button("Restart Interview"):
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
@@ -136,5 +160,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
