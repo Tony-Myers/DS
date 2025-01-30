@@ -4,7 +4,7 @@ import base64
 
 # Retrieve the password and DeepSeek API key from Streamlit secrets
 PASSWORD = st.secrets["password"]
-DEEPSEEK_API_KEY = st.secrets["deeplong_api_key"]
+DEEPSEEK_API_KEY = st.secrets["deepseek_api_key"]
 
 # List of interview topics
 interview_topics = [
