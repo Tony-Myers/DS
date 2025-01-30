@@ -5,13 +5,7 @@ import requests
 import re
 import tiktoken
 import os
-from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_ORIENT
-from docx.shared import Pt, Inches, RGBColor
-from docx.oxml import OxmlElement
-from docx.oxml.ns import nsdecls
-from io import BytesIO, StringIO
-from PyPDF2 import PdfReader
+
 
 # Configuration
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
