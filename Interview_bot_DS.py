@@ -43,7 +43,7 @@ def generate_response(prompt, conversation_history=None):
         }
         
         data = {
-            "model": "deepseek-chat-7b",  # Change if DeepSeek has a different model name
+            "model": "deepseek-chat-7b",  
             "messages": messages,
             "max_tokens": 500,
             "temperature": 0.6
