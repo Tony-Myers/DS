@@ -58,8 +58,7 @@ def generate_response(prompt, conversation_history=None):
 
 def get_transcript_download_link(conversation):
     df = pd.DataFrame(conversation)
-    markdown_content = '
-'.join([f"**{entry['role'].capitalize()}:** {entry['content']}" for entry in conversation])
+    markdown_content = '\n'.join([f"**{entry['role'].capitalize()}:** {entry['content']}" for entry in conversation])
     b64 = base64.b64encode(markdown_content.encode()).decode()
     href = f'<a href="data:file/markdown;base64,{b64}" download="interview_transcript.md">Download Transcript</a>'
     return href
